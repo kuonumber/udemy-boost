@@ -1,0 +1,57 @@
+{
+  "manifest_version": 3,
+  "name": "Udemy Boost",
+  "version": "0.4.2",
+  "description": "Udemy 學習增強：中英對照字幕（內建軌、簡轉繁、Chrome Translator / LibreTranslate 機翻）、可拖動字幕、一鍵下載課程補充資源。",
+  "permissions": [
+    "storage",
+    "downloads",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://www.udemy.com/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
+  "optional_host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.udemy.com/course/*/learn/*"
+      ],
+      "js": [
+        "src/content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "src/*.js",
+        "src/translate/*.js",
+        "src/download/*.js",
+        "src/learning/*.js",
+        "vendor/*.js"
+      ],
+      "matches": [
+        "https://www.udemy.com/*"
+      ]
+    }
+  ],
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": false
+  },
+  "action": {
+    "default_title": "Udemy Boost",
+    "default_popup": "options/options.html"
+  },
+  "background": {
+    "service_worker": "src/background.js",
+    "type": "module"
+  }
+}

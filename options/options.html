@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>Udemy Boost</title>
+<style>
+  body { font: 14px system-ui, sans-serif; margin: 0; padding: 14px 16px; width: 320px; color: #222; }
+  h1 { font-size: 15px; margin: 0 0 12px; }
+  h2 { font-size: 13px; margin: 14px 0 6px; color: #555; border-top: 1px solid #eee; padding-top: 10px; }
+  label { display: flex; justify-content: space-between; align-items: center; margin: 8px 0; gap: 8px; }
+  input[type=number] { width: 70px; }
+  input[type=text], input[type=password], select { flex: 1; min-width: 0; }
+  .row-check { justify-content: flex-start; }
+  .hint { color: #777; font-size: 12px; margin-top: 6px; }
+  .warn { color: #b00; }
+  button { font: inherit; padding: 3px 10px; }
+  .row-btn { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; gap: 8px; }
+  code { font-size: 11px; background: #f3f3f3; padding: 0 3px; }
+</style>
+</head>
+<body>
+  <h1>Udemy Boost</h1>
+  <label class="row-check"><input type="checkbox" id="enabled"> 啟用</label>
+  <label>字級 (px) <input type="number" id="fontSize" min="10" max="60"></label>
+  <label>距底部 (px) <input type="number" id="bottomOffset" min="0" max="2000"></label>
+  <label class="row-check"><input type="checkbox" id="zhFirst"> 中文在上</label>
+  <label class="row-check"><input type="checkbox" id="hideNative"> 隱藏 Udemy 原生字幕</label>
+  <div class="row-btn"><span class="hint">字幕可直接在影片上拖動。</span><button id="resetPos" type="button">位置重設</button></div>
+
+  <h2>中文處理</h2>
+  <label class="row-check"><input type="checkbox" id="opencc"> 簡體中文軌轉台灣繁體 (OpenCC)</label>
+
+  <h2>無中文軌時機器翻譯</h2>
+  <label>翻譯來源
+    <select id="provider">
+      <option value="none">不翻譯</option>
+      <option value="chrome">Chrome 內建 Translator</option>
+      <option value="libre">自架 LibreTranslate</option>
+    </select>
+  </label>
+  <div class="hint" id="chromeStatus"></div>
+  <label>LibreTranslate 網址 <input type="text" id="libreUrl" placeholder="http://localhost:5000"></label>
+  <label>API key（可空） <input type="password" id="libreApiKey"></label>
+  <div class="hint" id="libreHint">選的來源失敗會自動切換到另一個；狀態列會標示實際使用的來源。</div>
+  <div class="row-btn"><span class="hint" id="cacheStats"></span><button id="clearCache" type="button">清除翻譯快取</button></div>
+
+  <h2>學習歷程</h2>
+  <label class="row-check"><input type="checkbox" id="lpEnabled"> 記錄觀看時間與完成狀態</label>
+  <label>閒置停計（分鐘，0 = 不停） <input type="number" id="lpIdleMinutes" min="0" max="120"></label>
+  <label class="row-check"><input type="checkbox" id="lpRequireFocus"> 不在頁面上就停計（切到別的 app / 視窗失焦）</label>
+  <label class="row-check"><input type="checkbox" id="lpAutoExport"> 每次完成講次自動更新 progress.md</label>
+  <div class="hint" id="lpSummary">開啟課程播放頁後顯示本課摘要。</div>
+  <div class="row-btn">
+    <button id="lpClearBtn" type="button">清除本課記錄</button>
+    <button id="lpExportBtn" type="button">匯出 progress.md</button>
+  </div>
+  <div class="hint" id="lpHint">存到 Chrome 下載目錄 <code>Udemy/&lt;課程&gt;/progress.md</code>。完成狀態以 Udemy 的勾勾為準；安裝前完成的講次無時間。</div>
+
+  <h2>課程補充資源</h2>
+  <div class="hint">抓整門課每個講次 Resources 的檔案（PDF / zip / .blend…），存到 Chrome 下載目錄 <code>Udemy/&lt;課程&gt;/&lt;章&gt;/&lt;講&gt;/</code>；外部連結整理成 <code>links.md</code>。不含影片。</div>
+  <div class="row-btn"><span class="hint" id="dlSummary">尚未掃描</span><button id="scanBtn" type="button">掃描資源</button></div>
+  <div id="dlPlanBox" hidden>
+    <div class="hint" id="dlPlanDetail"></div>
+    <div class="row-btn"><span class="hint warn" id="dlWarn"></span><button id="startBtn" type="button">開始下載</button></div>
+  </div>
+  <div id="dlProgressBox" hidden>
+    <progress id="dlProgress" value="0" max="1" style="width:100%"></progress>
+    <div class="row-btn"><span class="hint" id="dlProgressText"></span><button id="cancelBtn" type="button">取消</button></div>
+    <details id="dlFailedBox" hidden><summary class="hint warn">失敗清單</summary><pre id="dlFailed" style="font-size:11px;white-space:pre-wrap;max-height:120px;overflow:auto"></pre></details>
+  </div>
+
+  <script type="module" src="options.js"></script>
+</body>
+</html>

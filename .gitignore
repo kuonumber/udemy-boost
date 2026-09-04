@@ -1,0 +1,27 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+
+# Node and test artifacts
+node_modules/
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+
+# Extension packages and local downloads
+*.zip
+downloads/
+Udemy/
+
+# Local operator history (may contain personal testing context)
+docs/worklog/
+
+# Logs and operating-system/editor files
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
