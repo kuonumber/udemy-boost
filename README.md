@@ -18,6 +18,10 @@
 6. popup「學習歷程」：自動記錄觀看時間與完成狀態（Udemy 勾勾為準），按「匯出 progress.md」寫到 `Udemy/<課程>/progress.md`；閒置 3 分鐘停計、可設自動更新。
 7. popup 最下方「課程補充資源」：在講次頁按「掃描資源」→ 看摘要 → 「開始下載」，檔案存到 Chrome 下載目錄的 `Udemy/<課程>/<章>/<講>/`，外部連結在 `links.md`。
 
+### LibreTranslate 本機環境
+
+使用 LibreTranslate provider 前，請依 [Conda / pip 安裝、啟動與 API 驗證說明](docs/libretranslate-setup.md)建立獨立環境。預設服務網址為 `http://localhost:5000`。
+
 ## 開發
 
 ```

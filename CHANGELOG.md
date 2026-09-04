@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- 文件：新增 LibreTranslate 的 Conda / pip 安裝、啟動、API 驗證與 Windows 注意事項。
+
 ## 0.1.0 - 2026-09-04
 
 - 首版：Udemy 講次頁顯示英文 + 中文（Udemy 內建軌，zh_TW > zh_HK > zh_CN）對照字幕。
