@@ -1,7 +1,5 @@
 # Udemy Boost
 
-（原名 Udemy Dual Subtitles，0.4.2 起專案資料夾與內部前綴一併改為 udemy-boost / `ub-`。）
-
 在 Udemy 影片上同時顯示英文與中文字幕，字幕可拖動；一鍵下載整門課的講師補充資源（不含影片）；記錄學習歷程並匯出每門課的 `progress.md`。
 
 中文來源優先序：
