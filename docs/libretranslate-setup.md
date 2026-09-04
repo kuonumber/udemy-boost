@@ -66,19 +66,19 @@ Invoke-RestMethod `
   -Body $body
 ```
 
-預期回應包含 `translatedText`。LibreTranslate 通常提供 `zh`，Udemy Boost 會再以 OpenCC 轉為台灣繁體；extension 也會先讀 `/languages`，以實際可用的 target code 為準。
+預期回應包含 `translatedText`。LibreTranslate 通常提供 `zh`，Udemy Boost 會再以 OpenCC 轉為台灣繁體；擴充功能也會先讀取 `/languages`，並以實際可用的目標語言代碼為準。
 
-## Extension 設定
+## 擴充功能設定
 
-1. 開啟 Udemy Boost popup。
+1. 開啟 Udemy Boost 擴充功能選單。
 2. 翻譯來源選 `LibreTranslate`。
 3. LibreTranslate 網址填 `http://localhost:5000`。
 4. 本機預設模式不需要 API key；若服務啟用了 `--api-keys`，再填入對應 key。
 
 ## 已知限制
 
-- 官方文件指出 production 建議使用 Gunicorn 或 Docker，以降低長時間執行的 memory leak 風險；上述方式定位為單機開發與個人使用。
-- LibreTranslate 官方曾建議 Windows 使用 Docker。若 native pip 安裝因 C/C++ build tool、依賴 wheel 或模型套件失敗，不要改用未經驗證的非官方套件；改採官方 Docker 流程。
+- 官方文件指出，正式服務建議使用 Gunicorn 或 Docker，以降低長時間執行時發生記憶體持續增加的風險；上述方式適合單機開發與個人使用。
+- LibreTranslate 官方曾建議 Windows 使用 Docker。若直接在 Windows 透過 pip 安裝時，因缺少 C/C++ 編譯工具、預編譯套件或模型套件而失敗，不要改用未經驗證的非官方套件；請改採官方 Docker 流程。
 - 不要將 LibreTranslate 直接綁定到公網介面。若必須跨機器使用，應另行設定 authentication、TLS、firewall 與 rate limit。
 
 ## 官方來源

@@ -3,8 +3,8 @@
 在 Udemy 影片上同時顯示英文與中文字幕，字幕可拖動；一鍵下載整門課的講師補充資源（不含影片）；記錄學習歷程並匯出每門課的 `progress.md`。
 
 中文來源優先序：
-1. Udemy 該講次已有的中文軌（zh_TW > zh_HK > zh_CN）；簡體軌自動以 OpenCC 轉台灣繁體。
-2. 沒有中文軌時（可選）機器翻譯整份英文字幕：Chrome 內建 Translator API（Chrome 138+，本機）或自架 LibreTranslate；首選失敗自動切換，結果快取。
+1. Udemy 該課程單元已有的中文字幕（zh_TW > zh_HK > zh_CN）；簡體中文字幕會自動透過 OpenCC 轉為台灣繁體。
+2. 沒有中文字幕時（可選）翻譯整份英文字幕：Chrome 內建 Translator API（Chrome 138+，本機）或自架 LibreTranslate；首選服務失敗時會自動切換，結果會保留在本機快取。
 
 預設（`不翻譯`）不會把任何資料送出瀏覽器。
 
@@ -12,29 +12,29 @@
 
 1. Chrome 開 `chrome://extensions`，右上角開「開發人員模式」。
 2. 「載入未封裝項目」→ 選這個資料夾（含 `manifest.json` 的那層）。
-3. 開任一 Udemy 講次頁 `https://www.udemy.com/course/*/learn/lecture/*`，字幕會自動出現。
+3. 開啟任一 Udemy 課程單元頁面 `https://www.udemy.com/course/*/learn/lecture/*`，字幕會自動出現。
 4. 點工具列圖示可調字級、位置、中文在上、是否隱藏原生字幕、OpenCC、翻譯來源與 LibreTranslate 網址。
 5. 字幕可直接在影片上拖動；Chrome Translator 第一次使用時影片上會出現「下載翻譯模型」按鈕。
-6. popup「學習歷程」：自動記錄觀看時間與完成狀態（Udemy 勾勾為準），按「匯出 progress.md」寫到 `Udemy/<課程>/progress.md`；閒置 3 分鐘停計、可設自動更新。
-7. popup 最下方「課程補充資源」：在講次頁按「掃描資源」→ 看摘要 → 「開始下載」，檔案存到 Chrome 下載目錄的 `Udemy/<課程>/<章>/<講>/`，外部連結在 `links.md`。
+6. 擴充功能選單的「學習歷程」會自動記錄觀看時間與完成狀態（以 Udemy 的完成標記為準）。按「匯出 progress.md」會寫入 `Udemy/<課程>/progress.md`；閒置 3 分鐘後停止計時，也可設定自動更新。
+7. 在擴充功能選單最下方的「課程補充資源」，依序按「掃描資源」→ 檢查摘要 →「開始下載」。檔案會存到 Chrome 下載目錄的 `Udemy/<課程>/<章節>/<單元>/`，外部連結則整理在 `links.md`。
 
 ### LibreTranslate 本機環境
 
-使用 LibreTranslate provider 前，請依 [Conda / pip 安裝、啟動與 API 驗證說明](docs/libretranslate-setup.md)建立獨立環境。預設服務網址為 `http://localhost:5000`。
+使用 LibreTranslate 翻譯服務前，請依 [Conda / pip 安裝、啟動與 API 驗證說明](docs/libretranslate-setup.md)建立獨立環境。預設服務網址為 `http://localhost:5000`。
 
 ## 開發
 
 ```
 npm test          # 單元測試（純函式）：vtt / align / locale / udemy-api / opencc / batch / cache / fallback / drag / libre / naming / curriculum / links
-npm run test:e2e  # Playwright + headless Chromium 載入未封裝 extension，跑假 Udemy 頁的完整流程（需 playwright 套件）
+npm run test:e2e  # Playwright + headless Chromium 載入未封裝 extension，在模擬 Udemy 頁面執行完整流程（需 playwright 套件）
 ```
 
 不需 build step；`src/content.js` 以動態 `import()` 載入 ES module 主程式。
 
 ## 已知限制
 
-- 講次沒有中文軌 → 只顯示英文，右上角標示「無中文軌」。
-- Udemy 的 `zh_HK` 軌內容有時其實是簡體字（Udemy 端標錯），預設會過 OpenCC 轉繁。
+- 課程單元沒有中文字幕 → 只顯示英文，右上角標示「無中文字幕」。
+- Udemy 的 `zh_HK` 字幕有時其實是簡體中文（Udemy 端標示有誤），預設會透過 OpenCC 轉為繁體。
 - Chrome Translator 需要使用者點一下才能下載模型（瀏覽器限制）；行動裝置不支援。
 - LibreTranslate 非 localhost 網址需在設定頁填入時授權該網域。
 - Udemy API 無公開文件、前端 class 帶 hash，改版可能失效。壞掉時先看 console `[ub]` 訊息。
