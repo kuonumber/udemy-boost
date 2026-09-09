@@ -16,6 +16,14 @@
   button { font: inherit; padding: 3px 10px; }
   .row-btn { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; gap: 8px; }
   code { font-size: 11px; background: #f3f3f3; padding: 0 3px; }
+  #ankiCards { max-height: 260px; overflow: auto; margin-top: 6px; }
+  .anki-card { border: 1px solid #e4e4e4; border-radius: 4px; padding: 6px; margin-bottom: 6px; }
+  .anki-card > header { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #555; }
+  .anki-card textarea { width: 100%; box-sizing: border-box; font: inherit; font-size: 12px; margin-top: 4px; }
+  .anki-card .st { margin-left: auto; font-size: 11px; }
+  .anki-card .st.added { color: #070; }
+  .anki-card .st.duplicate { color: #777; }
+  .anki-card .st.rejected, .anki-card .st.failed { color: #b00; }
 </style>
 </head>
 <body>
@@ -42,7 +50,22 @@
   <label>LibreTranslate 網址 <input type="text" id="libreUrl" placeholder="http://localhost:5000"></label>
   <label>API key（可空） <input type="password" id="libreApiKey"></label>
   <div class="hint" id="libreHint">選的來源失敗會自動切換到另一個；狀態列會標示實際使用的來源。</div>
-  <div class="row-btn"><span class="hint" id="cacheStats"></span><button id="clearCache" type="button">清除翻譯快取</button></div>
+  <div class="row-btn"><button id="libreGrantBtn" type="button">授權此網址</button><button id="clearCache" type="button">清除翻譯快取</button></div>
+  <div class="hint" id="cacheStats"></div>
+
+  <h2>Udemy 資料夾（檔案直寫）</h2>
+  <div class="hint">選一次 <code>Downloads/Udemy</code>，之後 progress.md / watch-log.csv / notes.md 直接讀寫、不跳下載提示，且會讀回舊記錄。沒選就維持下載模式。</div>
+  <div class="row-btn"><span class="hint" id="fsStatus">狀態讀取中…</span><button id="fsPickBtn" type="button">選擇資料夾</button></div>
+  <div class="row-btn"><span class="hint" id="fsQueue"></span><button id="fsReauthBtn" type="button" hidden>重新授權</button><button id="fsUnlinkBtn" type="button" hidden>取消連結</button></div>
+
+  <h2>專注</h2>
+  <label class="row-check"><input type="checkbox" id="fxAutoPause"> 失焦自動暫停影片</label>
+  <label>　延遲（秒，0 = 立即） <input type="number" id="fxAutoPauseDelayS" min="0" max="60"></label>
+  <label class="row-check"><input type="checkbox" id="fxPomodoro"> 連續觀看提醒休息</label>
+  <label>　連續分鐘數 <input type="number" id="fxPomodoroMin" min="5" max="180"></label>
+  <label class="row-check"><input type="checkbox" id="fxRecallPrompt"> 講次結束問「這講重點」→ 寫進 notes.md</label>
+  <label class="row-check"><input type="checkbox" id="fxTodayMinutes"> 狀態列顯示今日觀看分鐘數</label>
+  <label class="row-check"><input type="checkbox" id="fxAwayNotice"> 回到頁面時顯示離開多久</label>
 
   <h2>學習歷程</h2>
   <label class="row-check"><input type="checkbox" id="lpEnabled"> 記錄觀看時間與完成狀態</label>
@@ -67,6 +90,31 @@
     <progress id="dlProgress" value="0" max="1" style="width:100%"></progress>
     <div class="row-btn"><span class="hint" id="dlProgressText"></span><button id="cancelBtn" type="button">取消</button></div>
     <details id="dlFailedBox" hidden><summary class="hint warn">失敗清單</summary><pre id="dlFailed" style="font-size:11px;white-space:pre-wrap;max-height:120px;overflow:auto"></pre></details>
+  </div>
+
+
+  <h2>GPT → Anki</h2>
+  <div class="hint">把目前單元的字幕做成學習包，交給本機 Codex / Claude CLI 產生卡片，人工審核後才寫進 Anki。字幕只在你按下送出後離開瀏覽器。</div>
+  <div class="row-btn"><span class="hint">Extension Origin（貼進 server 的 <code>UDEMY_EXTENSION_ORIGIN</code>）</span></div>
+  <div class="hint"><code id="ankiOrigin"></code></div>
+  <label>配對 token <input type="password" id="ankiToken" placeholder="server 啟動時產生"></label>
+  <label>處理工具
+    <select id="ankiProcessor">
+      <option value="codex">Codex CLI</option>
+      <option value="claude">Claude CLI</option>
+    </select>
+  </label>
+  <div class="row-btn">
+    <button id="ankiConnectBtn" type="button">測試連線</button>
+    <button id="ankiExportBtn" type="button">匯出學習包</button>
+    <button id="ankiSendBtn" type="button">送到 AI Inbox</button>
+  </div>
+  <label>或匯入卡片 JSON <input type="file" id="ankiJsonInput" accept="application/json,.json"></label>
+  <div class="hint" id="ankiStatus">未連線。token 只存在 session，瀏覽器重啟要重新輸入。</div>
+  <div id="ankiCards"></div>
+  <div class="row-btn">
+    <button id="ankiClearBtn" type="button">清除草稿</button>
+    <button id="ankiSyncBtn" type="button" disabled>確認同步到 Anki</button>
   </div>
 
   <script type="module" src="options.js"></script>

@@ -4,7 +4,7 @@
 
 ## 脈絡
 
-使用者要一鍵抓整門課的講師補充資源（PDF / zip / .blend）。範圍明確排除影片（Udemy ToS + Widevine DRM）與字幕。
+Jimmy 要一鍵抓整門課的講師補充資源（PDF / zip / .blend）。範圍明確排除影片（Udemy ToS + Widevine DRM）與字幕。
 實測 Udemy curriculum API 一次回整門課，`File` 類 asset 帶 `att-c.udemycdn.com` 簽章 URL，匿名可抓。
 
 ## 決策

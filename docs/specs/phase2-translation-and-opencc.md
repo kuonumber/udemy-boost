@@ -4,7 +4,7 @@
 日期：2026-09-04
 前置：Phase 1 (`udemy-boost.md`) 已完成
 
-【實作後修訂】使用者決定：
+【實作後修訂】Jimmy 決定：
 - provider **自動 fallback**（原草稿為不 fallback）：選的 provider 不可用或失敗 → 換另一個 → 都失敗才只顯示英文。狀態列標示實際跑的 provider 與被切掉的原因。
 - 新增需求：**字幕可拖動**（見末段）。
 
@@ -137,7 +137,7 @@ opencc: true, provider: 'none'|'chrome'|'libre', libreUrl: 'http://localhost:500
 - 設定頁有「位置重設」按鈕（回到置中、距底 80px）。
 - 驗收：實測拖 (+100, −50) px 後 `onPositionChange` 收到 `{offsetX:100, bottom:130}`、DOM 位移一致、影片 `paused` 狀態不變。
 
-## 實作前驗證結果（2026-09-04，使用者的 Chrome 152）
+## 實作前驗證結果（2026-09-04，Jimmy 的 Chrome 152）
 
 - `typeof Translator === 'function'`，`availability({en → zh-Hant}) === 'downloadable'`。content script 端可否取用未直接驗證（推論：Web API global 在 isolated world 也存在）；載入 extension 後看狀態列即可確認。
 - `http://localhost:5000/languages` 打不到（LibreTranslate 未在跑）→ 繁中代碼由 `/languages` 動態判斷，`zh-Hant / zt / zh-TW` 直接用，只有 `zh` 時翻完過 OpenCC。

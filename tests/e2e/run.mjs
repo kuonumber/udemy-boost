@@ -60,7 +60,7 @@ async function main() {
   const ctx = await chromium.launchPersistentContext(userData, {
     headless: true,
     acceptDownloads: true,
-    channel: "chromium",
+    ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE } : { channel: "chromium" }),
     args: [`--disable-extensions-except=${extDir}`, `--load-extension=${extDir}`],
   });
   const page = await ctx.newPage();
@@ -177,6 +177,62 @@ async function main() {
   console.log("learning:", JSON.stringify({ exp: lp.exp, lectures: lp.lectures }, null, 1));
   console.log("progress.md:\n" + lp.md);
 
+  // ---------- Phase 5：連結資料夾（OPFS 代替真實資料夾）→ 舊 md 匯入 → 觀看段寫 CSV → 匯出新 md ----------
+  const extId = new URL(swForLp.url()).host;
+  const optPage = await ctx.newPage();
+  await optPage.goto(`chrome-extension://${extId}/options/options.html?mode=tab`);
+  await optPage.evaluate(async () => {
+    const { saveHandle } = await import("/src/fs/handle-store.js");
+    const root = await navigator.storage.getDirectory();
+    // 放一份 Phase 4 格式的舊 progress.md 進去，驗匯入
+    const dir = await root.getDirectoryHandle("fake udemy", { create: true });
+    const f = await dir.getFileHandle("progress.md", { create: true });
+    const w = await f.createWritable();
+    await w.write("# fake udemy\n\n- 更新：2026-09-04 09:30\n\n## 01. Intro Getting Started ⏳ 1/2 · 4m 12s\n\n| # | 講次 | 狀態 | 觀看 | 完成時間 |\n|---|------|------|------|----------|\n| 2 | Interface and settings | ▶ 進行中 | 4m 12s | |\n| 3 | Object Navigation | ✅ | — | （安裝前） |\n");
+    await w.close();
+    await saveHandle(root);
+  });
+  await optPage.close();
+  // 補寫佇列（之前 Phase 4 播放時的段落可能已排隊），再播 2.5 秒產生新段
+  await swForLp.evaluate(() => globalThis.__ubHandleMessage({ type: "fs:flushQueue" }));
+  await page.bringToFront();
+  await page.evaluate(async () => {
+    const v = document.getElementById("v");
+    v.currentTime = 1;
+    await Promise.race([v.play(), new Promise((r) => setTimeout(r, 2000))]);
+  });
+  await page.waitForTimeout(2600);
+  await page.evaluate(() => document.getElementById("v").pause());
+  await page.waitForTimeout(1500); // 等 pause 那一秒的 tick 關段並寫入
+  const p5 = await swForLp.evaluate(async () => {
+    const [tab] = await chrome.tabs.query({ url: "https://www.udemy.test/*" });
+    const exp = await chrome.tabs.sendMessage(tab.id, { type: "lp:export" });
+    const csv = await globalThis.__ubHandleMessage({ type: "fs:read", path: "fake udemy/watch-log.csv" });
+    const md = await globalThis.__ubHandleMessage({ type: "fs:read", path: "fake udemy/progress.md" });
+    const baks = [];
+    for (const d of ["2026-09-09", "2026-09-10", "2026-09-11"]) {
+      const r = await globalThis.__ubHandleMessage({ type: "fs:exists", path: `fake udemy/progress.${d}.bak.md` });
+      if (r.exists) baks.push(d);
+    }
+    const q = await globalThis.__ubHandleMessage({ type: "fs:queueSize" });
+    return { exp, csv: csv.text, md: md.text, baks, queue: q.size };
+  });
+  console.log("phase5 export:", JSON.stringify(p5.exp));
+  console.log("phase5 csv:\n" + (p5.csv ?? "(null)"));
+  console.log("phase5 md head:\n" + (p5.md ?? "(null)").split("\n").slice(0, 12).join("\n"));
+  const csvLines = (p5.csv ?? "").trim().split(/\r?\n/);
+  const p5Ok =
+    p5.exp?.ok === true && p5.exp.mode === "folder" && p5.exp.path === "Udemy/fake udemy/progress.md" &&
+    csvLines[0].replace(/^\uFEFF/, "").startsWith("segment_start,segment_end,lecture_id") &&
+    csvLines.some((l) => l.includes(",imported,")) && // 舊 md 匯入
+    csvLines.some((l) => l.includes(",52212451,") && /,(pause|lecture_switch|page_hide|blur|hidden),/.test(l)) && // 真實觀看段
+    p5.baks.length >= 1 &&
+    p5.queue === 0 &&
+    p5.md?.includes("| # | 講次 | 狀態 | 觀看 | 專注比 | 分心 | 回看 | 完成時間 |") &&
+    p5.md?.includes("匯入舊記錄") &&
+    p5.md?.includes("## 週趨勢");
+  console.log("phase5 check:", p5Ok ? "ok" : "FAIL");
+
   // ---------- Phase 3：scan → start → progress → 檔案落地 ----------
   let sw = ctx.serviceWorkers()[0] ?? (await ctx.waitForEvent("serviceworker"));
   const dl = await sw.evaluate(async () => {
@@ -226,7 +282,7 @@ async function main() {
     lp.md && lp.md.includes("| 2 | Interface and settings | ▶ 進行中 |") && lp.md.includes("| 3 | Object Navigation | ✅ | — | （安裝前） |") &&
     lp.md.includes("進度：1 / 2 講（50%）");
   console.log("learning check:", lpOk ? "ok" : "FAIL");
-  const ok = dlOk && lpOk &&
+  const ok = dlOk && lpOk && p5Ok &&
     at7.en === "Now let's take a look at the program's interface." &&
     at7.zh === "現在讓我們來看一下程式的介面。" &&
     /繁體/.test(result.status) &&

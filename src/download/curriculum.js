@@ -25,7 +25,7 @@ export function buildPlan(results, course) {
   if (!Array.isArray(results)) throw new TypeError("results must be an array");
   if (!course || typeof course.slug !== "string" || !course.slug) throw new TypeError("course.slug required");
 
-  // 資料夾用課程名稱（使用者要求），沒有 title 才退 slug
+  // 資料夾用課程名稱（Jimmy 要求），沒有 title 才退 slug
   const root = `Udemy/${safeSegment(String(course.title?.trim() || course.slug))}`;
   // 實測：API 回傳順序就是課程大綱順序；chapter 與 lecture 的 object_index 是各自獨立的序號（c1, l1..l9, c2, l10…），
   // 不能拿來混合排序，否則講次會被歸到錯的章。

@@ -38,6 +38,18 @@ const STYLE = `
   border: 0; border-radius: 3px; padding: 3px 10px;
 }
 #${ROOT_ID} .ub-action[hidden] { display: none; }
+#${ROOT_ID} .ub-aux { font-size: 12px; color: #9fd3ff; background: rgba(0,0,0,.5); padding: 1px 6px; border-radius: 3px; white-space: nowrap; }
+#${ROOT_ID} .ub-aux:empty { display: none; }
+#${ROOT_ID} .ub-toast { font-size: 13px; color: #fff; background: rgba(86,36,208,.85); padding: 3px 10px; border-radius: 3px; white-space: nowrap; }
+#${ROOT_ID} .ub-toast:empty { display: none; }
+#${ROOT_ID} .ub-prompt { pointer-events: auto; background: rgba(0,0,0,.85); border-radius: 6px; padding: 8px 10px; width: min(520px, 90vw); display: flex; flex-direction: column; gap: 6px; }
+#${ROOT_ID} .ub-prompt[hidden] { display: none; }
+#${ROOT_ID} .ub-prompt label { font-size: 13px; color: #fff; }
+#${ROOT_ID} .ub-prompt textarea { width: 100%; box-sizing: border-box; min-height: 56px; font: 14px system-ui, sans-serif; border-radius: 3px; border: 1px solid #666; padding: 4px 6px; resize: vertical; }
+#${ROOT_ID} .ub-prompt .ub-prompt-row { display: flex; justify-content: flex-end; gap: 8px; }
+#${ROOT_ID} .ub-prompt button { font-size: 12px; border: 0; border-radius: 3px; padding: 3px 10px; cursor: pointer; }
+#${ROOT_ID} .ub-prompt .ub-ok { background: #5624d0; color: #fff; }
+#${ROOT_ID} .ub-prompt .ub-skip { background: #444; color: #ddd; }
 .ub-hide-native ${NATIVE_CAPTION_SELECTORS.join(", .ub-hide-native ")} { visibility: hidden !important; }
 `;
 
@@ -53,8 +65,14 @@ export class Overlay {
     this.root = document.createElement("div");
     this.root.id = ROOT_ID;
     this.root.innerHTML =
-      '<div class="ub-status"></div><button class="ub-action" type="button" hidden></button>' +
+      '<div class="ub-toast"></div><div class="ub-prompt" hidden><label></label><textarea rows="2"></textarea>' +
+      '<div class="ub-prompt-row"><button class="ub-skip" type="button">略過</button><button class="ub-ok" type="button">送出</button></div></div>' +
+      '<div class="ub-status"></div><div class="ub-aux"></div><button class="ub-action" type="button" hidden></button>' +
       '<div class="ub-lines"><div class="ub-line ub-en"></div><div class="ub-line ub-zh"></div></div>';
+    this.toastEl = this.root.querySelector(".ub-toast");
+    this.auxEl = this.root.querySelector(".ub-aux");
+    this.promptEl = this.root.querySelector(".ub-prompt");
+    this._toastTimer = 0;
     this.linesEl = this.root.querySelector(".ub-lines");
     this.enEl = this.root.querySelector(".ub-en");
     this.zhEl = this.root.querySelector(".ub-zh");
@@ -143,6 +161,56 @@ export class Overlay {
 
   setStatus(text) {
     this.statusEl.textContent = text ?? "";
+  }
+
+  /** 狀態列旁的輔助字（今日分鐘數等）。 */
+  setAux(text) {
+    this.auxEl.textContent = text ?? "";
+  }
+
+  /** 短暫提示（離開多久、休息提醒）；ms 後自動清除，ms=0 常駐直到下次 setToast。 */
+  setToast(text, ms = 5000) {
+    clearTimeout(this._toastTimer);
+    this.toastEl.textContent = text ?? "";
+    if (text && ms > 0) this._toastTimer = setTimeout(() => (this.toastEl.textContent = ""), ms);
+  }
+
+  /** 顯示輸入框；resolve 文字或 null（略過）。同時只會有一個。 */
+  showPrompt(label) {
+    return new Promise((resolve) => {
+      const p = this.promptEl;
+      const ta = p.querySelector("textarea");
+      const done = (v) => {
+        p.hidden = true;
+        ok.onclick = skip.onclick = null;
+        ta.onkeydown = null;
+        resolve(v);
+      };
+      const ok = p.querySelector(".ub-ok");
+      const skip = p.querySelector(".ub-skip");
+      p.querySelector("label").textContent = label;
+      ta.value = "";
+      p.hidden = false;
+      ok.onclick = (e) => {
+        e.stopPropagation();
+        done(ta.value.trim() || null);
+      };
+      skip.onclick = (e) => {
+        e.stopPropagation();
+        done(null);
+      };
+      ta.onkeydown = (e) => {
+        e.stopPropagation(); // 不要觸發播放器快捷鍵（空白鍵播放等）
+        if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) ok.click();
+        if (e.key === "Escape") skip.click();
+      };
+      for (const ev of ["keyup", "keypress", "pointerdown", "click"]) p.addEventListener(ev, (e) => e.stopPropagation());
+      ta.focus();
+    });
+  }
+
+  hidePrompt() {
+    this.promptEl.hidden = true;
   }
 
   /** 顯示一顆動作按鈕（例如「下載翻譯模型」）；label 為空則隱藏。 */

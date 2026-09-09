@@ -20,7 +20,7 @@ Google Cloud Translation（每月 500k 字元免費但要綁 billing）、DeepL�
 
 ## 替代方案
 
-- 不 fallback、只用使用者選的 provider：行為可預測，但 LibreTranslate 沒開機就沒字幕。使用者選自動切。
+- 不 fallback、只用使用者選的 provider：行為可預測，但 LibreTranslate 沒開機就沒字幕。Jimmy 選自動切。
 - 逐句即時翻譯：Chrome Translator 同一 instance 一次只能一個 `translate()`（文件明載），會排隊落後；Cloud API 逐句計費也不划算。
 - Google Cloud / DeepL / LLM provider：都要 key 或付費，先不做；介面已留好，加一個檔案即可。
 - OpenCC 用 `full` build 或遠端 CDN：MV3 禁止遠端 script；full 比 cn2t 只多 0.1 MB 但用不到 t2cn，選 cn2t。

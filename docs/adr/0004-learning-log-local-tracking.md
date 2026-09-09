@@ -4,7 +4,7 @@
 
 ## 脈絡
 
-使用者要每門課一份 progress.md：完成的章節、每章花費時間、何時完成。實測 Udemy progress API 只給 `completed_lecture_ids`，沒有時間資訊。
+Jimmy 要每門課一份 progress.md：完成的章節、每章花費時間、何時完成。實測 Udemy progress API 只給 `completed_lecture_ids`，沒有時間資訊。
 
 ## 決策
 

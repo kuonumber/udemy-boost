@@ -1,17 +1,18 @@
 {
   "manifest_version": 3,
   "name": "Udemy Boost",
-  "version": "0.4.2",
-  "description": "Udemy 學習增強：中英對照字幕（內建軌、簡轉繁、Chrome Translator / LibreTranslate 機翻）、可拖動字幕、一鍵下載課程補充資源。",
+  "version": "0.6.0",
+  "description": "Udemy 學習增強：中英對照字幕、簡轉繁、機翻、可拖動字幕、一鍵下載課程資源、學習歷程與專注度分析（CSV / Markdown 直寫）、GPT 學習包與 Anki 卡片同步。",
   "permissions": [
-    "storage",
+    "activeTab",
     "downloads",
-    "activeTab"
+    "offscreen",
+    "scripting",
+    "storage"
   ],
   "host_permissions": [
     "https://www.udemy.com/*",
-    "http://localhost/*",
-    "http://127.0.0.1/*"
+    "http://127.0.0.1:8765/*"
   ],
   "optional_host_permissions": [
     "http://*/*",
@@ -35,6 +36,9 @@
         "src/translate/*.js",
         "src/download/*.js",
         "src/learning/*.js",
+        "src/focus/*.js",
+        "src/fs/*.js",
+        "src/anki/*.js",
         "vendor/*.js"
       ],
       "matches": [

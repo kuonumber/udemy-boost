@@ -18,6 +18,19 @@ export async function fetchCompletedIds(courseId) {
   return Array.isArray(j.completed_lecture_ids) ? j.completed_lecture_ids : [];
 }
 
+const TODAY_KEY = "ub:today";
+const localDate = () => new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+
+/** 今日累計（跨日自動歸零）。 */
+export async function getToday() {
+  const r = (await chrome.storage.local.get(TODAY_KEY))[TODAY_KEY];
+  return r && r.date === localDate() ? r.ms : 0;
+}
+async function addToday(ms) {
+  const cur = await getToday();
+  await chrome.storage.local.set({ [TODAY_KEY]: { date: localDate(), ms: cur + ms } });
+}
+
 export class Tracker {
   /**
    * @param {{courseId, lectureId, courseTitle, slug, store, getVideo:()=>HTMLVideoElement|null,
@@ -30,6 +43,7 @@ export class Tracker {
     this.dirty = false;
     this.dead = false;
     this.lastActivity = Date.now();
+    this.todayMs = 0; // 本 tracker 生命期內累加，flush 時併入 ub:today
     this.onActivity = () => (this.lastActivity = Date.now());
     this.onVisibility = () => this.flush();
     this.timers = [];
@@ -54,16 +68,28 @@ export class Tracker {
     if (this.dead || !this.log) return;
     const v = this.getVideo();
     const playing = !!v && !v.paused && !v.ended && v.readyState >= 2;
-    const ok = shouldCount({
-      playing,
-      visible: document.visibilityState === "visible",
-      focused: document.hasFocus(),
-      requireFocus: !!this.requireFocus,
-      idleMs: Date.now() - this.lastActivity,
-      idleLimitMs: this.idleLimitMs,
+    const visible = document.visibilityState === "visible";
+    const focused = document.hasFocus();
+    const idleMs = Date.now() - this.lastActivity;
+    const ok = shouldCount({ playing, visible, focused, requireFocus: !!this.requireFocus, idleMs, idleLimitMs: this.idleLimitMs });
+    // 沒計時的原因（給 segmenter 當 end_reason；優先序：影片結束 > 暫停 > 分頁隱藏 > 失焦 > 閒置）
+    let reason = null;
+    if (!ok) {
+      if (v?.ended) reason = "ended";
+      else if (!playing) reason = "pause";
+      else if (!visible) reason = "hidden";
+      else if (this.requireFocus && !focused) reason = "blur";
+      else reason = "idle";
+    }
+    // 把原始事實一起傳出去：介入層要自己判斷「離開」，不能從 reason 推
+    // （自動暫停一啟動 reason 就變 "pause"，會被誤判成已回來）
+    this.onSample?.({
+      counting: ok, reason, video: v, now: new Date(),
+      visible, focused, idleMs, requireFocus: !!this.requireFocus, idleLimitMs: this.idleLimitMs,
     });
     if (!ok) return;
     this.log = tick(this.log, this.lectureId, TICK_MS, new Date().toISOString());
+    this.todayMs += TICK_MS;
     this.dirty = true;
   }
 
@@ -71,6 +97,11 @@ export class Tracker {
     if (!this.log || !this.dirty) return;
     this.dirty = false;
     await this.store.set(this.log);
+    if (this.todayMs > 0) {
+      const add = this.todayMs;
+      this.todayMs = 0;
+      await addToday(add);
+    }
     this.onChange?.(this.log);
   }
 

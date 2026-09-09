@@ -6,6 +6,10 @@ const LOG = "[ub:bg]";
 const CONCURRENCY = 4;
 const JOB_KEY = "dl:job";
 
+// storage.session 存下載 job 與（由 popup 寫入的）Inbox 配對 token。
+// 明確鎖在 TRUSTED_CONTEXTS：content script 跑在 udemy.com 頁面上，不得讀到配對 token。
+chrome.storage.session.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" }).catch((e) => console.warn(LOG, "setAccessLevel", e));
+
 // onChanged 事件會並發進來，read-modify-write 要序列化，否則 done/failed 會漏算
 let lock = Promise.resolve();
 function withLock(fn) {
@@ -119,8 +123,68 @@ chrome.downloads.onChanged.addListener((delta) =>
   }),
 );
 
+// ---------- File System Access：經 offscreen document 讀寫 Udemy 資料夾 ----------
+const OFFSCREEN_URL = "src/offscreen/offscreen.html";
+const FSQ_KEY = "ub:fsq"; // 寫失敗（未選資料夾 / 未授權）時的追加佇列（storage.local，重開瀏覽器不丟）
+let offscreenReady = null;
+
+async function ensureOffscreen() {
+  if (!offscreenReady) {
+    offscreenReady = (async () => {
+      if (await chrome.offscreen.hasDocument?.()) return;
+      await chrome.offscreen.createDocument({
+        url: OFFSCREEN_URL,
+        reasons: ["BLOBS"],
+        justification: "Read/write progress.md, watch-log.csv and notes.md in the user-selected Udemy folder via File System Access API",
+      });
+    })().catch((e) => {
+      offscreenReady = null;
+      // 已存在會丟錯，視為 ready
+      if (!/single offscreen|already exists/i.test(String(e?.message))) throw e;
+    });
+  }
+  return offscreenReady;
+}
+
+async function fsCall(msg) {
+  await ensureOffscreen();
+  const r = await chrome.runtime.sendMessage({ ...msg, target: "offscreen" });
+  if (r === undefined) throw new Error("offscreen did not respond");
+  return r;
+}
+
+async function fsQueuePush(item) {
+  const q = (await chrome.storage.local.get(FSQ_KEY))[FSQ_KEY] ?? [];
+  q.push(item);
+  await chrome.storage.local.set({ [FSQ_KEY]: q });
+  return q.length;
+}
+
+/** 資料夾可用時把佇列補寫回去；回傳補寫筆數。 */
+async function fsFlushQueue() {
+  const q = (await chrome.storage.local.get(FSQ_KEY))[FSQ_KEY] ?? [];
+  let n = 0;
+  for (const item of q) {
+    const r = await fsCall({ type: "fs:append", path: item.path, text: item.text, header: item.header });
+    if (!r.ok) break;
+    n++;
+  }
+  await chrome.storage.local.set({ [FSQ_KEY]: q.slice(n) });
+  return n;
+}
+
 /** popup → background 的訊息處理；也給 e2e 直接呼叫（SW 收不到自己送的 runtime message）。 */
 export async function handleMessage(msg) {
+  if (typeof msg?.type === "string" && msg.type.startsWith("fs:")) {
+    if (msg.type === "fs:flushQueue") return { ok: true, flushed: await fsFlushQueue() };
+    if (msg.type === "fs:queueSize") return { ok: true, size: ((await chrome.storage.local.get(FSQ_KEY))[FSQ_KEY] ?? []).length };
+    const r = await fsCall(msg).catch((e) => ({ ok: false, error: e?.message ?? String(e), code: null }));
+    if (!r.ok && msg.type === "fs:append" && (r.code === "no-handle" || r.code === "no-permission" || r.code === null)) {
+      const size = await fsQueuePush({ path: msg.path, text: msg.text, header: msg.header ?? "" });
+      return { ok: false, queued: true, size, code: r.code, error: r.error };
+    }
+    return r;
+  }
   switch (msg?.type) {
     case "start": {
       const job = newJob(msg.plan);
