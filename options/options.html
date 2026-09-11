@@ -93,6 +93,12 @@
   </div>
 
 
+  <h2>Google Drive 同步</h2>
+  <div class="hint">把 <code>watch-log.csv</code> 與 <code>notes.md</code> 同步到 Drive 的「Udemy Boost」資料夾，讓另一台電腦接續。權限只有 <code>drive.file</code>：只能碰這個 extension 自己建立的檔案。</div>
+  <div class="row-btn"><span class="hint" id="driveStatus">未連結</span><button id="driveConnectBtn" type="button">連結 Google Drive</button></div>
+  <div class="row-btn"><button id="driveDisconnectBtn" type="button" hidden>中斷連結</button><button id="driveSyncBtn" type="button">立即同步</button></div>
+  <div class="hint" id="driveRedirect">使用的帳號＝目前登入 Chrome 的 Google 帳號。</div>
+
   <h2>GPT → Anki</h2>
   <div class="hint">把目前單元的字幕做成學習包，交給本機 Codex / Claude CLI 產生卡片，人工審核後才寫進 Anki。字幕只在你按下送出後離開瀏覽器。</div>
   <div class="row-btn"><span class="hint">Extension Origin（貼進 server 的 <code>UDEMY_EXTENSION_ORIGIN</code>）</span></div>

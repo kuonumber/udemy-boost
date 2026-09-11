@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   啟動 Udemy Boost 需要的本機服務（LibreTranslate 5000、anki-mcp-server Inbox 8766），不安裝任何東西。
 
@@ -35,8 +35,18 @@ $ErrorActionPreference = 'Stop'
 $Root = Split-Path -Parent $PSScriptRoot
 if (-not $ServerDir) { $ServerDir = Join-Path (Split-Path -Parent $Root) 'anki-mcp-server' }
 
+# extension id 由 manifest 的 "key" 決定，直接推導，不必手動貼。
+# 只有在 manifest 沒釘 key（id 由資料夾路徑決定）時才需要 -ExtensionOrigin。
+$originSource = 'parameter'
+if (-not $ExtensionOrigin) {
+    $derivedId = Get-ExtensionId -ManifestPath (Join-Path $Root 'manifest.json')
+    if ($derivedId) {
+        $ExtensionOrigin = "chrome-extension://$derivedId"
+        $originSource = 'manifest key'
+    }
+}
 if (-not $SkipInbox -and -not $ExtensionOrigin) {
-    Write-Host "需要 -ExtensionOrigin（popup『GPT → Anki』最上方那串 chrome-extension://<id>），或用 -SkipInbox 跳過 Inbox。" -ForegroundColor Red
+    Write-Host "manifest.json 沒有 key，無法推導 extension id。請用 -ExtensionOrigin 指定（popup『GPT → Anki』最上方那串），或用 -SkipInbox 跳過 Inbox。" -ForegroundColor Red
     exit 2
 }
 if ($ExtensionOrigin -and $ExtensionOrigin -notmatch '^chrome-extension://[a-p]{32}$') {
@@ -47,6 +57,7 @@ if ($ExtensionOrigin -and $ExtensionOrigin -notmatch '^chrome-extension://[a-p]{
 Write-Host "Udemy Boost 啟動腳本$(if ($DryRun) { '（DryRun：只印不做）' })" -ForegroundColor Cyan
 Write-Host "  anki-mcp-server : $ServerDir"
 Write-Host "  conda env       : $CondaEnv"
+if ($ExtensionOrigin) { Write-Host "  extension origin: $ExtensionOrigin（來源：$originSource）" }
 Write-Host ''
 
 # ---------- 1. port 檢查 ----------

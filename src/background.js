@@ -1,6 +1,12 @@
 // MV3 service worker：接收下載計畫 → chrome.downloads.download()，追蹤進度。
 // 狀態存 chrome.storage.session（worker 會被 Chrome 閒置回收，不能靠記憶體）。
 import { render as renderLinks } from "./download/links.js";
+import { createDriveAuth } from "./drive/flow.js";
+import { createDriveClient, DriveAuthError } from "./drive/client.js";
+import { ROOT_FOLDER } from "./drive/config.js";
+import { createSyncer } from "./sync/orchestrator.js";
+import { mergeCsv } from "./sync/csv-merge.js";
+import { mergeNotes } from "./sync/notes-merge.js";
 
 const LOG = "[ub:bg]";
 const CONCURRENCY = 4;
@@ -173,6 +179,96 @@ async function fsFlushQueue() {
   return n;
 }
 
+// ---------- Google Drive 授權 ----------
+// 必須跑在 service worker：launchWebAuthFlow 會開新視窗，popup 隨即被 Chrome 關閉，
+// 在 popup 裡跑的話 JS 環境會在換 token 之前就消失（實測：狀態停在「未連結」，沒有任何錯誤）。
+const driveAuth = createDriveAuth();
+
+// Drive client 用 Chrome 代管的 token。快取中的 token 仍可能失效（撤銷 / 改密碼），
+// 遇到 401 就把它踢出快取重取一次，而不是叫使用者重新授權。
+let lastToken = null;
+const driveClient = createDriveClient({
+  getToken: async () => (lastToken = await driveAuth.getAccessToken()),
+});
+
+const SYNC_STATE_KEY = "sync:state";
+const syncState = {
+  async get(key) {
+    return ((await chrome.storage.local.get(SYNC_STATE_KEY))[SYNC_STATE_KEY] ?? {})[key] ?? null;
+  },
+  async set(key, value) {
+    const all = (await chrome.storage.local.get(SYNC_STATE_KEY))[SYNC_STATE_KEY] ?? {};
+    all[key] = value;
+    await chrome.storage.local.set({ [SYNC_STATE_KEY]: all });
+  },
+};
+
+// 檔案走既有的 offscreen + File System Access 通道；路徑相對於使用者選的 Udemy 資料夾。
+const syncFiles = {
+  async read(path) {
+    const r = await fsCall({ type: "fs:read", path });
+    if (!r.ok) throw new Error(r.error ?? "讀取失敗");
+    return r.text;
+  },
+  async write(path, text) {
+    const r = await fsCall({ type: "fs:write", path, text });
+    if (!r.ok) throw new Error(r.error ?? "寫入失敗");
+  },
+};
+
+const syncer = createSyncer({ drive: driveClient, files: syncFiles, state: syncState, rootFolder: ROOT_FOLDER });
+
+/**
+ * 同步哪些檔：
+ * - watch-log.csv：真相來源，集合聯集合併（無衝突）。
+ * - notes.md：手寫內容，entry 級合併（同 id 取新、真衝突兩則都留），絕不單邊覆蓋。
+ * - progress.md：由 CSV 算出的衍生物，localWins（同步完 CSV 後由播放頁重算再推上去）。
+ */
+function specsFor(courseDir, only = ["csv", "notes", "md"]) {
+  const all = {
+    csv: {
+      key: `${courseDir}/watch-log.csv`,
+      localPath: `${courseDir}/watch-log.csv`,
+      remoteName: `${courseDir}__watch-log.csv`,
+      mimeType: "text/csv",
+      merge: mergeCsv,
+    },
+    notes: {
+      key: `${courseDir}/notes.md`,
+      localPath: `${courseDir}/notes.md`,
+      remoteName: `${courseDir}__notes.md`,
+      mimeType: "text/markdown",
+      merge: mergeNotes,
+    },
+    md: {
+      key: `${courseDir}/progress.md`,
+      localPath: `${courseDir}/progress.md`,
+      remoteName: `${courseDir}__progress.md`,
+      mimeType: "text/markdown",
+      localWins: true,
+    },
+  };
+  return only.map((k) => all[k]).filter(Boolean);
+}
+
+async function runSync(courseDir, only) {
+  if (!courseDir) throw new Error("缺少課程名稱");
+  const status = await fsCall({ type: "fs:status" });
+  if (!(status.ok && status.linked && status.permission === "granted")) {
+    throw new Error("尚未連結本機 Udemy 資料夾（設定頁的「Udemy 資料夾」），同步需要讀得到 watch-log.csv");
+  }
+  try {
+    return await syncer.syncAll(specsFor(courseDir, only));
+  } catch (e) {
+    if (e instanceof DriveAuthError && e.status === 401 && lastToken) {
+      await driveAuth.invalidate(lastToken);
+      lastToken = null;
+      return syncer.syncAll(specsFor(courseDir, only));
+    }
+    throw e;
+  }
+}
+
 /** popup → background 的訊息處理；也給 e2e 直接呼叫（SW 收不到自己送的 runtime message）。 */
 export async function handleMessage(msg) {
   if (typeof msg?.type === "string" && msg.type.startsWith("fs:")) {
@@ -226,6 +322,14 @@ export async function handleMessage(msg) {
       const id = await chrome.downloads.download({ url, filename: msg.path, conflictAction: "overwrite", saveAs: false });
       return { ok: true, id };
     }
+    case "drive:status":
+      return { ok: true, ...(await driveAuth.status()) };
+    case "drive:connect":
+      return { ok: true, ...(await driveAuth.connect()) };
+    case "drive:disconnect":
+      return { ok: true, ...(await driveAuth.disconnect()) };
+    case "drive:sync":
+      return { ok: true, ...(await runSync(msg.courseDir, msg.only)) };
     case "clearJob": {
       await chrome.storage.session.remove(JOB_KEY);
       return { ok: true };

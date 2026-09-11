@@ -2,7 +2,7 @@
 
 （原名 Udemy Dual Subtitles，0.4.2 起專案資料夾與內部前綴一併改為 udemy-boost / `ub-`。）
 
-在 Udemy 影片上同時顯示英文與中文字幕，字幕可拖動；一鍵下載整門課的講師補充資源（不含影片）；記錄學習歷程與專注度（分心 / 專注比 / 回看 / 時段），資料直寫 `Udemy/<課程>/watch-log.csv`，每門課一份 `progress.md` 分析與 `notes.md` 回想筆記。
+在 Udemy 影片上同時顯示英文與中文字幕，字幕可拖動；一鍵下載整門課的講師補充資源（不含影片）；記錄學習歷程與專注度（分心 / 專注比 / 回看 / 時段），資料直寫 `Udemy/<課程>/watch-log.csv`，每門課一份 `progress.md` 分析與 `notes.md` 回想筆記；學習資料可同步到 Google Drive 供多台電腦接續。
 
 中文來源優先序：
 1. Udemy 該講次已有的中文軌（zh_TW > zh_HK > zh_CN）；簡體軌自動以 OpenCC 轉台灣繁體。
@@ -21,14 +21,15 @@
 7. popup「專注」：失焦自動暫停、休息提醒、講次結束回想筆記、今日分鐘數、離開提示，各自開關。
 8. popup「學習歷程」：自動記錄觀看時間與完成狀態（Udemy 勾勾為準），按「匯出 progress.md」寫到 `Udemy/<課程>/progress.md`；閒置 3 分鐘停計、可設自動更新。
 9. popup「GPT → Anki」：按「匯出學習包」得到 `Udemy/<課程>/<章>/<單元>/study-pack.md`，交給 ChatGPT 產生卡片 JSON 後回來匯入；或輸入本機 anki-mcp-server 的配對 token，選 Codex / Claude 後按「送到 AI Inbox」讓本機 CLI 產卡。卡片一律逐張審核（可編輯 / 取消）後才寫進 Anki（deck `Udemy Boost::<課程>`，需要 Anki 開著並裝 AnkiConnect）。
-10. 自架 LibreTranslate（含 `localhost`）第一次使用要在 popup 按一次「授權此網址」——0.6.0 起 manifest 不再帶寬鬆的 localhost 權限（ADR 0008）。
-11. popup 最下方「課程補充資源」：在講次頁按「掃描資源」→ 看摘要 → 「開始下載」，檔案存到 Chrome 下載目錄的 `Udemy/<課程>/<章>/<講>/`，外部連結在 `links.md`。
+10. popup「Google Drive 同步」：按「連結 Google Drive」授權一次（scope 只有 `drive.file`，只能存取本 extension 自己建立的檔案），之後在課程播放頁按「立即同步」，會把 `watch-log.csv`（集合聯集）、`notes.md`（逐則合併，衝突兩則都留）、`progress.md`（本機重算後上傳）同步到 Drive 的 `Udemy Boost` 資料夾。另一台電腦載入同一份 extension 就能接續——**兩台的 extension id 必須相同**，由 `manifest.json` 的 `key` 保證。
+11. 自架 LibreTranslate（含 `localhost`）第一次使用要在 popup 按一次「授權此網址」——0.6.0 起 manifest 不再帶寬鬆的 localhost 權限（ADR 0008）。
+12. popup 最下方「課程補充資源」：在講次頁按「掃描資源」→ 看摘要 → 「開始下載」，檔案存到 Chrome 下載目錄的 `Udemy/<課程>/<章>/<講>/`，外部連結在 `links.md`。
 
 ## 開發
 
 ```
-npm test          # 單元測試 + 靜態契約檢查（327 tests）：vtt / align / locale / udemy-api / opencc / batch / cache /
-                  # fallback / drag / libre / naming / curriculum / links / learning-log / focus-* / options-* / learn-url / anki-*
+npm test          # 單元測試 + 靜態契約檢查（429 tests）：vtt / align / locale / udemy-api / opencc / batch / cache /
+                  # fallback / drag / libre / naming / curriculum / links / learning-log / focus-* / options-* / learn-url / anki-* / drive-* / sync-*
 npm run test:e2e  # 真瀏覽器主流程（Playwright + Chromium 載入未封裝 extension，假 Udemy 頁）
 
 # 其餘 e2e（不在 npm test 內，各自單獨執行）

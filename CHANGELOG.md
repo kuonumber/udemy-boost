@@ -80,3 +80,17 @@
 - **權限收窄（行為變更）**：`host_permissions` 移除 `http://localhost/*` 與 `http://127.0.0.1/*`，只留 `https://www.udemy.com/*` 與 `http://127.0.0.1:8765/*`（AnkiConnect）。自架 LibreTranslate 的位址（含 localhost）改由設定頁「授權此網址」按鈕動態授權。詳見 ADR 0008。
 - 新增 e2e `tests/e2e/anki-popup.mjs`：不需要 anki-mcp-server，8766 / 8765 都在瀏覽器層假造，涵蓋匯出、JSON 匯入（含課程不符必須拒絕）、送出 → 輪詢 → 草稿、編輯 / 取消 / 同步、草稿續存與清除，共 17 checks。
 - 四支舊 e2e 改為可用 `PLAYWRIGHT_CHROMIUM_EXECUTABLE` 指定瀏覽器（容器內預裝的 chromium 與 npm 安裝的 playwright 版本不一定相符）。
+
+## 0.7.0 - 2026-09-11
+
+- **Google Drive 跨電腦同步**：popup 新增「Google Drive 同步」區塊，連結後可把課程資料同步到 Drive 的 `Udemy Boost` 資料夾，另一台電腦載入同一份 extension（同 key = 同 extension id）即可接續。
+- 三個檔案、三種策略，刻意不共用同一招：
+  - `watch-log.csv`：**集合聯集**。每列不可變，以正規化後的整列為身分，兩台同時看課也不會衝突；合併可交換且冪等。
+  - `notes.md`：**entry 級合併**。每則筆記帶穩定 id 與 rev，同 id 取 rev 新者；rev 相同但內容不同時**兩則都保留**並標 `ub:conflict`，絕不替使用者挑。舊格式（只有 `<!-- lecture:N -->`）以內容決定性地算出 id，兩台機器算出來一致，不會變成重複。
+  - `progress.md`：**localWins**。它是從 CSV 算出來的衍生物，同步順序固定為「先合併 CSV → 播放頁重算 → 才推上雲」，反過來會把舊資料算出的報告推上去。
+- 授權用 `chrome.identity.getAuthToken` + **Chrome Extension 類型**的 OAuth client，scope 只有 `drive.file`（只能存取本 extension 自己建立的檔案）。token 由 Chrome 代管與續期，extension 不碰 token endpoint、不保存任何 secret。
+- `manifest.json` 加入 `key`，把 extension id 釘死為 `fibpdpmpjgaaloabohjjoinmghdocjni`，兩台電腦才會是同一個 id（OAuth 與 Inbox 的 Origin 都依賴它）。`scripts/start.ps1` 改為直接從 manifest 推導 origin，不用再手貼。
+- 選擇 Udemy 資料夾後會健檢層級：選到 `Udemy/<課程>` 或底下出現同名子資料夾時明確提示（實際踩過：路徑變成 `Udemy/<課程>/<課程>/watch-log.csv`，同步找不到檔案）。
+- 設定頁加上全域錯誤攔截：未處理的錯誤與 Promise rejection 一律顯示在畫面上，不再有「按了沒反應也沒訊息」。
+- 修正：「立即同步」按鈕預設 `disabled`，而啟用它的程式碼在改版中被移除，導致按鈕永遠不可按且點擊被靜默吞掉。已加契約測試釘住。
+- PowerShell 腳本改存 UTF-8 **with BOM**：Windows PowerShell 5.1 對無 BOM 的 `.ps1` 以 ANSI(Big5) 解讀，中文全部亂碼並引發 parser error。

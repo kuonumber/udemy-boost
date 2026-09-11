@@ -6,6 +6,7 @@ import { fetchCompletedIds } from "../learning/tracker.js";
 import { headerLine, toRow, parseRows } from "./csv.js";
 import { parseProgressMd, fromPhase4Log, toImportedSegments } from "./importer.js";
 import { buildFocusReport, renderFocusMarkdown, renderNoteEntry } from "./render.js";
+import { noteMarker } from "../sync/notes-merge.js";
 
 const LOG = "[ub:fs]";
 export const EXT_VERSION = chrome.runtime.getManifest().version;
@@ -92,8 +93,10 @@ export async function appendNote(courseTitle, meta, lectureId, text) {
     text,
     timeZone: tz(),
   });
-  const header = `# ${courseTitle} — 回想筆記\n\n<!-- Udemy Boost notes; 每則以 lectureId 標記 -->\n\n`;
-  return appendText(`${courseDir(courseTitle)}/notes.md`, `<!-- lecture:${lectureId} -->\n${entry}`, header);
+  const header = `# ${courseTitle} — 回想筆記\n\n<!-- Udemy Boost notes; 每則以 ub:note 標記，id 用於跨裝置合併 -->\n\n`;
+  // id + rev 是跨裝置合併的依據（Phase 6b）：同 id 取 rev 新者，rev 相同但內容不同則兩則都留。
+  const marker = noteMarker({ id: crypto.randomUUID(), lectureId, rev: new Date().toISOString() });
+  return appendText(`${courseDir(courseTitle)}/notes.md`, `${marker}\n${entry}`, header);
 }
 
 function notesIndexFrom(text) {

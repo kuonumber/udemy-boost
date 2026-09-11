@@ -25,3 +25,7 @@ docs/worklog/
 Thumbs.db
 .idea/
 .vscode/
+
+# Extension signing key¡]µ´¤£¶iª©±±¡^
+*.pem
+*.crx

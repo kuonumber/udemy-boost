@@ -1,4 +1,4 @@
-# Udemy Boost 安裝／啟動腳本共用函式。
+﻿# Udemy Boost 安裝／啟動腳本共用函式。
 # 輸出契約：[ok] / [skip] / [warn] / [fail] <步驟> — <細節>，結尾印摘要。
 # 規則：外部命令一律檢查 $LASTEXITCODE，不吞錯；不印 token / 金鑰內容，只印路徑。
 
@@ -134,6 +134,24 @@ function Find-Chrome {
     )
     foreach ($c in $candidates) { if ($c -and (Test-Path $c)) { return $c } }
     return $null
+}
+
+<#
+ 從 manifest.json 的 "key" 推導出 Chrome 固定的 extension id。
+ 演算法：公鑰 DER 的 SHA-256 取前 16 bytes，每個 hex nibble 對映 0-f → a-p。
+ 沒有 key（未釘死 id）時回 $null——此時 id 由資料夾路徑決定，只能由使用者自己指定。
+#>
+function Get-ExtensionId {
+    param([Parameter(Mandatory)][string]$ManifestPath)
+    if (-not (Test-Path $ManifestPath)) { return $null }
+    $m = Get-Content $ManifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    $keyProp = $m.PSObject.Properties['key']
+    if (-not $keyProp -or [string]::IsNullOrWhiteSpace($keyProp.Value)) { return $null }
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try { $hash = $sha.ComputeHash([Convert]::FromBase64String($keyProp.Value)) }
+    finally { $sha.Dispose() }
+    $hex = -join ($hash[0..15] | ForEach-Object { $_.ToString('x2') })
+    return -join ($hex.ToCharArray() | ForEach-Object { [char](97 + [Convert]::ToInt32([string]$_, 16)) })
 }
 
 <# 摘要表 + 下一步人工動作。回傳建議的離開碼（有 fail 就是 1）。 #>

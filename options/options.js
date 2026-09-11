@@ -9,6 +9,7 @@ import { validateCardPackage, draftKey } from "../src/anki/cards.js";
 import { createDraft, draftPackage, editDraftCard, selectedPendingIndices, markSyncResults } from "../src/anki/draft.js";
 import { syncCardsToAnki } from "../src/anki/client.js";
 import { createInboxClient } from "../src/anki/inbox.js";
+import { safeSegment } from "../src/download/naming.js";
 
 const FIELDS = {
   enabled: "checked",
@@ -33,6 +34,17 @@ const FIELDS = {
   fxAwayNotice: "checked",
   ankiProcessor: "value",
 };
+
+// 任何沒被接住的錯誤都要在畫面上看得見。
+// 教訓：同步按鈕曾經「按了沒反應也沒錯誤」，那是最難查的失敗模式。
+function showFatal(where, err) {
+  console.error("[ub:options]", where, err);
+  const el = document.getElementById("driveStatus") ?? document.body;
+  el.textContent = `${where}：${err?.message ?? err}`;
+  el.classList?.add("warn");
+}
+window.addEventListener("error", (e) => showFatal("未處理錯誤", e.error ?? e.message));
+window.addEventListener("unhandledrejection", (e) => showFatal("未處理的 Promise 錯誤", e.reason));
 
 const cache = createChromeCache();
 const $ = (id) => document.getElementById(id);
@@ -289,6 +301,28 @@ async function refreshFsStatus() {
   $("fsQueue").textContent = qs;
 }
 
+/**
+ * 選完資料夾後的健檢。實際踩過的坑：使用者選到「Udemy/<課程>」而不是「Udemy」，
+ * 結果程式又在底下建一層 <課程>/，路徑變成 Udemy/<課程>/<課程>/watch-log.csv，
+ * 同步找不到檔案卻只回「沒東西」。這裡直接把疑點講出來。
+ */
+async function checkFolderShape(handle) {
+  const notes = [];
+  if (handle.name !== "Udemy") notes.push(`選到的是「${handle.name}」而不是「Udemy」`);
+  try {
+    for await (const [name, entry] of handle.entries()) {
+      if (entry.kind !== "directory") continue;
+      if (name === handle.name) {
+        notes.push(`底下有同名子資料夾「${name}」，看起來是層級選深了一層`);
+        break;
+      }
+    }
+  } catch (e) {
+    console.warn("[ub:options] 無法列出資料夾內容", e);
+  }
+  return notes;
+}
+
 async function pickFolder() {
   if (!IS_TAB) {
     // popup 開檔案選擇器會被關掉，改在分頁開設定頁
@@ -299,6 +333,13 @@ async function pickFolder() {
     const h = await window.showDirectoryPicker({ mode: "readwrite", id: "udemy-root" });
     await saveHandle(h);
     await chrome.runtime.sendMessage({ type: "fs:flushQueue" }).catch(() => {});
+    const warnings = await checkFolderShape(h);
+    if (warnings.length) {
+      $("fsQueue").textContent = `注意：${warnings.join("；")}。正確的選法是選 Downloads\\Udemy 那一層。`;
+      $("fsQueue").classList.add("warn");
+    } else {
+      $("fsQueue").classList.remove("warn");
+    }
   } catch (e) {
     if (e?.name !== "AbortError") $("fsStatus").textContent = `選擇失敗：${e.message}`;
   }
@@ -577,6 +618,115 @@ async function initAnkiUi() {
   });
 }
 
+// ---------- Google Drive 同步 ----------
+
+// 授權在 background service worker 執行；popup 只送訊息。
+// 理由：launchWebAuthFlow 一開新視窗，popup 就被關掉，在這裡跑會半途死掉。
+async function drive(type) {
+  const r = await chrome.runtime.sendMessage({ type });
+  if (!r?.ok) throw new Error(r?.error ?? "background 沒有回應");
+  return r;
+}
+
+function driveMsg(text, warn = false) {
+  $("driveStatus").textContent = text;
+  $("driveStatus").classList.toggle("warn", warn);
+}
+
+let driveConnected = false;
+
+async function refreshDriveStatus() {
+  const st = await drive("drive:status");
+  driveConnected = !!st.connected;
+  $("driveDisconnectBtn").hidden = !driveConnected;
+  // 刻意不 disable 同步按鈕：disabled 的按鈕連 click 事件都不會發出，
+  // 使用者按了完全沒反應也沒訊息——這正是最難查的失敗模式。改成按下去明確說原因。
+  driveMsg(driveConnected ? "已連結" : "未連結");
+}
+
+async function initDriveUi() {
+
+  $("driveConnectBtn").addEventListener("click", async () => {
+    $("driveConnectBtn").disabled = true;
+    driveMsg("等待 Google 授權…");
+    try {
+      await drive("drive:connect");
+      driveMsg("已連結");
+    } catch (e) {
+      driveMsg(`連結失敗：${e.message}`, true);
+    } finally {
+      $("driveConnectBtn").disabled = false;
+      await refreshDriveStatus();
+    }
+  });
+
+  $("driveDisconnectBtn").addEventListener("click", async () => {
+    if (!confirm("中斷與 Google Drive 的連結？（Drive 上已同步的檔案不會刪除，本機資料也不受影響）")) return;
+    await drive("drive:disconnect");
+    await refreshDriveStatus();
+  });
+
+  $("driveSyncBtn").addEventListener("click", async () => {
+    console.info("[ub:options] sync clicked");
+    if (!driveConnected) return driveMsg("尚未連結 Google Drive，請先按上方的「連結 Google Drive」。", true);
+    $("driveSyncBtn").disabled = true;
+    driveMsg("同步中…（讀取課程資訊）");
+    try {
+      // 課程資料夾名稱與本機一致（safeSegment 後的課程標題），所以要先問播放頁是哪一門課
+      const { summary } = await sendToLearnTab({ type: "lp:summary" });
+      driveMsg(`同步中…（${summary.title}）`);
+      const courseDir = safeSegment(summary.title);
+      const sync = async (only) => {
+        const r = await chrome.runtime.sendMessage({ type: "drive:sync", courseDir, only });
+        if (!r?.ok) throw new Error(r?.error ?? "background 沒有回應");
+        const one = r.results[0];
+        if (!one.ok) throw new Error(one.error);
+        return one;
+      };
+
+      // 順序有意義：先把觀看記錄合併好，再用合併後的 CSV 重算 progress.md，最後才推分析報告。
+      // 反過來做會把舊資料算出來的報告推上雲端。
+      const one = await sync(["csv"]);
+
+      driveMsg(`${courseDir}：同步筆記…`);
+      let mdNote = "";
+      try {
+        const notes = await sync(["notes"]);
+        if (notes.conflicts) mdNote += `，notes.md 有 ${notes.conflicts} 則衝突待人工處理`;
+        else if (notes.added) mdNote += `，notes.md 併入 ${notes.added} 則`;
+      } catch (e) {
+        mdNote += `，notes.md 同步失敗：${e.message}`;
+      }
+
+      driveMsg(`${courseDir}：重新產生 progress.md…`);
+      try {
+        await sendToLearnTab({ type: "lp:export" });
+        const md = await sync(["md"]);
+        mdNote += md.action === "up-to-date" ? "，progress.md 已是最新" : "，progress.md 已同步";
+      } catch (e) {
+        mdNote += `，progress.md 同步失敗：${e.message}`;
+      }
+      const detail = {
+        create: "已上傳（首次）",
+        download: "已從雲端取回",
+        upload: "已上傳變更",
+        merge: `已合併（共 ${one.total} 列，新增 ${one.added} 列）`,
+        "up-to-date": "已是最新",
+        noop: `找不到 Udemy 資料夾裡的「${one.localPath}」，雲端也沒有——這門課還沒有觀看記錄，或資料夾名稱不一致`,
+      }[one.action] ?? one.action;
+      driveMsg(`${courseDir}：${detail}${mdNote}`, one.action === "noop" || mdNote.includes("失敗"));
+      console.info("[ub:options] sync result", one, mdNote);
+    } catch (e) {
+      driveMsg(`同步失敗：${e.message}`, true);
+    } finally {
+      $("driveSyncBtn").disabled = false;
+      await refreshDriveStatus();
+    }
+  });
+
+  await refreshDriveStatus();
+}
+
 async function init() {
   await initFsUi();
   await initDownloadUi();
@@ -600,6 +750,7 @@ async function init() {
     saveOptions({ offsetX: 0, bottomOffset: 80 });
     $("bottomOffset").value = 80;
   });
+  await initDriveUi();
   $("libreGrantBtn").addEventListener("click", () => ensureLibrePermission($("libreUrl").value));
   await initAnkiUi();
   $("clearCache").addEventListener("click", async () => {
@@ -609,4 +760,4 @@ async function init() {
   await Promise.all([refreshCacheStats(), refreshChromeStatus()]);
 }
 
-init();
+init().catch((e) => showFatal("設定頁初始化失敗", e));

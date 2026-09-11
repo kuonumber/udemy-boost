@@ -1,18 +1,22 @@
 {
   "manifest_version": 3,
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0FV+KMgJOOo2+84r0dpj8BtN50fXZi+X2nzKDFWHSTnb1nKAJu/Zjb/JsZmJWCjcR5xNA7zjLZw1ipM+dCj9E82RXj80D1i2MuBAGEg9SxewFzNRhdKr8wF9cJZTK+W70lxvlkS+ZDXw+Y9fDVE/xNkFibj+w7XuQiYrYP4p8gP5HIWZlfokMraiUOYORQ7p3N9oEnbg2lI0VvCA8rJ+q4OoUtRr+IM9tOnk75yGwjrXIdsQtlj1E37gmxIBEmhN6v0p7OZuyXMCzBGa9BsrSUv4rw/uM9l2RimBDqb5H/lp3D5hUQCDIyCLSd8/vKfPV4RLdwNwX5uF+IsdM7E7xwIDAQAB",
   "name": "Udemy Boost",
-  "version": "0.6.0",
-  "description": "Udemy 學習增強：中英對照字幕、簡轉繁、機翻、可拖動字幕、一鍵下載課程資源、學習歷程與專注度分析（CSV / Markdown 直寫）、GPT 學習包與 Anki 卡片同步。",
+  "version": "0.7.0",
+  "description": "Udemy 學習增強：中英對照字幕、簡轉繁、機翻、可拖動字幕、一鍵下載課程資源、學習歷程與專注度分析（CSV / Markdown 直寫）、GPT 學習包與 Anki 卡片同步、Google Drive 跨電腦同步。",
   "permissions": [
     "activeTab",
     "downloads",
+    "identity",
     "offscreen",
     "scripting",
     "storage"
   ],
   "host_permissions": [
     "https://www.udemy.com/*",
-    "http://127.0.0.1:8765/*"
+    "http://127.0.0.1:8765/*",
+    "https://www.googleapis.com/*",
+    "https://oauth2.googleapis.com/*"
   ],
   "optional_host_permissions": [
     "http://*/*",
@@ -39,6 +43,8 @@
         "src/focus/*.js",
         "src/fs/*.js",
         "src/anki/*.js",
+        "src/drive/*.js",
+        "src/sync/*.js",
         "vendor/*.js"
       ],
       "matches": [
@@ -53,6 +59,12 @@
   "action": {
     "default_title": "Udemy Boost",
     "default_popup": "options/options.html"
+  },
+  "oauth2": {
+    "client_id": "778676922326-43qiqnkaigpj10umrar0vnsn749fapq7.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/drive.file"
+    ]
   },
   "background": {
     "service_worker": "src/background.js",

@@ -1,6 +1,6 @@
 # Spec: Phase 6 — 筆記與觀看資料的 Google Drive 跨電腦同步
 
-狀態：**待確認**，未實作。
+狀態：6a / 6b 已實作並經真實 Drive 驗證（2026-09-11）。6c（Doc 鏡像）未做，可能不做。
 日期：2026-09-11
 
 ## 需求（使用者確認）
@@ -37,8 +37,8 @@
    鏡像是單向的，在 Doc 上編輯會被下次同步覆蓋，UI 要明講。
 3. **`progress.md` 不參與合併**：它是從 CSV 產生的衍生物，同步後在本機重算。
 
-> 若你真的要「在 Google Docs 網頁上編筆記」，那是另一條路（見「延後：Doc 原生編輯」），
-> 需要一個跳脫正規化器與可見式 entry marker，且仍有腐爛風險。先不做。
+> 使用者已確認（2026-09-11）：「兩邊都能編」指的是**兩台電腦的 extension 都能編**，
+> 不需要在 Google Docs 網頁上編。所以下方「延後：Doc 原生編輯」整段不做，6c 降為選配。
 
 ## 資料模型與合併規則
 
@@ -57,9 +57,12 @@
   後者標 `<!-- ub:conflict -->` 並在 popup 提示（**不靜默丟棄任何人寫的字**）。
 - 刪除 = tombstone（`<!-- ub:note id=... deleted=<ISO> -->`），避免「A 刪除、B 同步後復活」。
 
-### progress.md — 衍生
+### progress.md — 衍生，localWins（實作修正）
 
-同步後以合併完的 CSV 重算。Drive 上那份只是最新產生結果。
+規格原本寫「不同步」。使用者要求 progress.md 也要上雲，於是改為**同步但不合併**：
+只要本機有這個檔就以本機為準（`localWins`），本機沒有才從雲端取回。
+同步順序固定：先合併 `watch-log.csv` → 請播放頁重算 `progress.md` → 才推上雲。
+反過來做會把舊資料算出來的報告推上去。
 
 ## 同步狀態
 
@@ -86,9 +89,19 @@
 4. 兩邊都變 → 下載遠端 → 依上述規則合併 → 寫回本地 → 以
    `If-Match: <etag>` 上傳（412 就重跑整個流程，最多 3 次）。
 
-## OAuth 與權限
+## OAuth 與權限（實作時被推翻並修正）
 
-- `chrome.identity.launchWebAuthFlow` + **PKCE**，redirect 為 `https://<extension-id>.chromiumapp.org/`。
+原規格寫 PKCE + `launchWebAuthFlow` + Web application client。**實測失敗**：
+Google 的 Web application client 屬於 confidential client，token endpoint 回
+`invalid_request: client_secret is missing`，而 secret 不能放進 extension。
+
+改為 Chrome 官方指定做法（https://developer.chrome.com/docs/extensions/how-to/integrate/oauth）：
+**Chrome Extension 類型的 OAuth client + `chrome.identity.getAuthToken`**，token 由 Chrome
+取得、快取與續期，extension 不碰 token endpoint、沒有自己的 refresh token 要管。
+代價：使用的 Google 帳號＝目前登入 Chrome 的帳號，不另外選。
+PKCE 相關程式（`src/drive/auth.js`）已整支刪除，不留死碼。
+
+- 舊設計（已作廢）：`launchWebAuthFlow` + PKCE，redirect `https://<extension-id>.chromiumapp.org/`。
 - scope 只要 **`https://www.googleapis.com/auth/drive.file`**：只能存取「這個 app 自己建立的檔案」，
   碰不到你 Drive 的其他東西。
 - manifest 加 `"key"` 固定 extension id（否則每次重新載入 id 會變，OAuth client 對不上）；
@@ -152,6 +165,28 @@ e2e：以假的 Drive endpoint（瀏覽器層 route，如同 `anki-popup.mjs` �
 
 - **6a**：OAuth + Drive client + CSV 同步（無衝突那半）。
 - **6b**：notes 的 id 遷移與 entry 級合併 + 衝突提示。
-- **6c**（選配）：progress.md 的 Google Doc 唯讀鏡像。
+- **6c**（選配，可能不做）：progress.md 的 Google Doc 唯讀鏡像——只為了手機閱讀方便，與同步正確性無關。
 
 建議一期一期來，6a 跑穩了再動 6b。
+
+## 實作後補記（2026-09-11）
+
+### 實際踩到的坑
+
+1. **授權跑在 popup 會失敗**：`launchWebAuthFlow` / `getAuthToken` 一開視窗，Chrome 就關掉 popup，
+   JS 環境在換 token 之前消失，症狀是「狀態停在未連結、沒有任何錯誤」。授權與同步全部移到
+   background service worker，popup 只送訊息。契約測試釘住這件事。
+2. **Web application client 走不通**（見上）。
+3. **`disabled` 按鈕吞掉點擊**：使用者按了完全沒反應也沒訊息。原則改為：寧可讓他按下去然後明講原因，
+   也不要 disable。
+4. **資料夾層級選錯**：選到 `Udemy/<課程>` 而不是 `Udemy`，路徑變成 `Udemy/<課程>/<課程>/watch-log.csv`。
+   選完資料夾後新增健檢並提示。
+5. **File System Access 的授權不保證跨 extension 重載存活**（0.5.0 起掛在未驗證清單上的疑問，
+   這次確認會掉）。掉了以後同步第一步就會回「尚未連結本機 Udemy 資料夾」，需重選資料夾。
+
+### 已驗 / 未驗
+
+- 已驗（真實 Drive）：連結授權、`watch-log.csv` 首次上傳、`Udemy Boost` 資料夾自動建立。
+- 已驗（測試）：兩台裝置收斂（合併後兩邊位元相同、無重複、再同步為 up-to-date）、412 衝突重試、
+  notes 的 entry 合併與衝突保留、progress.md 的 localWins。
+- **未驗**：真的用兩台電腦跑一輪；Chrome token 長期續期行為；notes.md 在真實 Drive 上的合併。

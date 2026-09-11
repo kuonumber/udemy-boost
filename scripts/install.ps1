@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   一次裝齊 Udemy Boost 完整鏈路需要的本機工具（只安裝與檢查，不常駐）。
 
@@ -184,10 +184,19 @@ else {
 }
 
 # ---------- 6. 人工步驟 ----------
+$C = '6 extension'
 Add-NextStep '開啟 Anki，工具 → 附加元件 → 取得附加元件，搜尋安裝 AnkiConnect，然後重新啟動 Anki。'
 Add-NextStep "Chrome 開 chrome://extensions → 開發人員模式 → 載入未封裝項目 → 選 $Root"
-Add-NextStep '點工具列的 Udemy Boost 圖示，複製「GPT → Anki」區塊最上方的 chrome-extension://<id>。'
-Add-NextStep ".\scripts\start.ps1 -ExtensionOrigin 'chrome-extension://<id>' 啟動 LibreTranslate 與 Inbox listener。"
+$extId = Get-ExtensionId -ManifestPath (Join-Path $Root 'manifest.json')
+if ($extId) {
+    Add-Result -Chain $C -Status 'ok' -Name 'extension id（由 manifest key 推導，跨電腦固定）' -Detail $extId
+    Add-NextStep "載入後確認 chrome://extensions 顯示的 ID 是 $extId；不一致代表 manifest 的 key 不對。"
+    Add-NextStep '.\scripts\start.ps1 啟動 LibreTranslate 與 Inbox listener（origin 會自動從 manifest 推導，不用手貼）。'
+}
+else {
+    Add-Result -Chain $C -Status 'warn' -Name 'extension id' -Detail 'manifest.json 沒有 key，id 會隨資料夾路徑改變'
+    Add-NextStep '點工具列圖示，複製「GPT → Anki」最上方的 chrome-extension://<id>，啟動時用 -ExtensionOrigin 指定。'
+}
 Add-NextStep '若要用自架 LibreTranslate：popup 翻譯來源選「自架 LibreTranslate」後，按一次「授權此網址」（0.6.0 起必要）。'
 
 exit (Show-Summary -Title '安裝摘要')
