@@ -210,7 +210,7 @@ if ((START_INBOX)); then
     if [[ -z "$CODEX_BIN" ]]; then
       result fail 'Inbox service' 'Codex CLI not found; install or open the ChatGPT app first'
     else
-      PROCESSOR_CMD="$(node -e 'console.log(JSON.stringify([process.argv[1],"exec","--skip-git-repo-check","-o","{output}","-"]))' "$CODEX_BIN")"
+      PROCESSOR_CMD="$(node -e 'console.log(JSON.stringify([process.argv[1],"exec","--sandbox","read-only","--ephemeral","--skip-git-repo-check","-o","{output}","-"]))' "$CODEX_BIN")"
       NODE_BIN="$(command -v node)"
       if launchctl submit -l com.kuonumber.anki-mcp-inbox -- /usr/bin/env \
           "UDEMY_EXTENSION_ORIGIN=$EXTENSION_ORIGIN" \
