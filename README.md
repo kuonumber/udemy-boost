@@ -12,6 +12,22 @@
 
 ## 安裝（未封裝載入）
 
+macOS 可先執行一鍵安裝腳本；若尚未安裝 Conda，腳本會透過 Homebrew 安裝 Miniconda：
+
+```sh
+./scripts/install.sh --dry-run
+./scripts/install.sh
+```
+
+可用 `--skip-libre` 跳過 Miniconda／LibreTranslate，或用 `--skip-tests` 跳過測試工具與驗證。
+載入套件後，若要使用「送到 AI Inbox」，先從 popup 複製 Extension Origin，啟動登入期間的本機服務：
+
+```sh
+./scripts/install.sh --skip-libre --skip-tests --start-inbox --extension-origin chrome-extension://<popup顯示的32字元ID>
+```
+
+腳本只顯示配對 token 的檔案位置，不顯示內容。將檔案內的 token 貼到 popup 後按「測試連線」。重啟 Mac 或登出後需重新啟動 Inbox；重啟 Chrome 後需重新輸入 token。Codex CLI 必須已安裝或可從 ChatGPT.app 取得。
+
 1. Chrome 開 `chrome://extensions`，右上角開「開發人員模式」。
 2. 「載入未封裝項目」→ 選這個資料夾（含 `manifest.json` 的那層）。
 3. 開任一 Udemy 講次頁 `https://www.udemy.com/course/*/learn/lecture/*`，字幕會自動出現。

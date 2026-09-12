@@ -1,4 +1,4 @@
-# Spec: 一鍵安裝與啟動腳本（Windows PowerShell）
+# Spec: 一鍵安裝與啟動腳本（Windows PowerShell / macOS Bash）
 
 狀態：已實作（2026-09-11），**未在 Windows 實機驗證**。
 日期：2026-09-11
@@ -8,6 +8,7 @@
 把 Udemy Boost 完整鏈路需要的本機工具，用兩支可重跑的 PowerShell 腳本裝齊與啟動：
 
 - `scripts/install.ps1`：只安裝與檢查，不常駐。可重複執行且無副作用累積（idempotent）。
+- `scripts/install.sh`：macOS 版本；缺少 Conda 時以 `brew install --cask miniconda` 安裝 Miniconda；可選擇用 `--start-inbox --extension-origin` 啟動登入期間的本機 Inbox。
 - `scripts/start.ps1`：只啟動服務，不安裝。每天要用的那一支。
 
 涵蓋四條鏈路（使用者確認）：Anki 鏈路、LibreTranslate、測試依賴、環境檢查與 extension 指引。
@@ -25,6 +26,7 @@
 
 ```
 udemy-boost/scripts/install.ps1
+udemy-boost/scripts/install.sh
 udemy-boost/scripts/start.ps1
 udemy-boost/scripts/lib/common.ps1   # 共用：版本檢查、port 檢查、輸出格式、Require/Warn
 ```
